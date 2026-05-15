@@ -6,12 +6,16 @@
 #include <mpf2mpfr.h> //converts all mpf into mpfr
 #include "real_numbers.h"
 
+static void calculate_set_constant(mpf_t constant_var);
 char* calc_pi(int precision, int max_sum);
 static void pi_summation(mpf_t *sum_ptr, int max_sum);
+static char* calc_pi_binary_split(int precision, int digits);
+static mpz_t* binary_split(mpz_t a, mpz_t b, mpz_t C3_OVER_24);
+static mpz_t* calc_Pab(mpz_t a, mpz_t *Pab);
+static mpz_t* calc_Qab(mpz_t a, mpz_t C3_OVER_24, mpz_t *Qab);
+static mpz_t* calc_Tab(mpz_t a, mpz_t Pab, mpz_t *Tab);
 
-char* calc_pi(int precision, int max_sum) {
-    mpf_set_default_prec(precision);
-
+static void calculate_set_constant(mpf_t constant_var) {
     //making series constant
     mpf_t f_series_const;
     mpf_init(f_series_const);
@@ -27,8 +31,21 @@ char* calc_pi(int precision, int max_sum) {
     mpfr_pow(const_denom, const_denom, three_twos, MPFR_RNDN);
 
     mpf_div(f_series_const, const_numer, const_denom);
+
+    mpf_clear(const_numer);
+    mpf_clear(const_denom);
+
+    mpf_set(constant_var, f_series_const);
+}
+
+char* calc_pi(int precision, int max_sum) {
+    mpf_set_default_prec(precision);
     //mpf_set_d(f_series_const, 2.3419932855e-8);
     //mpfr_printf("f_series_const: %0.50Rf\n", f_series_const);
+
+    mpf_t f_series_const;
+    mpf_init(f_series_const);
+    calculate_set_constant(f_series_const);
 
     mpf_t sum;
     mpf_init(sum);
@@ -56,8 +73,6 @@ char* calc_pi(int precision, int max_sum) {
     //printf("pi str: %s\n", pi_str);
     mpf_clear(sum);
     mpf_clear(f_series_const);
-    mpf_clear(const_numer);
-    mpf_clear(const_denom);
 
     return pi_str;
 }
@@ -152,4 +167,218 @@ static void pi_summation(mpf_t *sum_ptr, int max_sum) {
     }
 
     mpf_set(*sum_ptr, sum);
+}
+
+char* calc_pi_binary_split(int precision, int digits) {
+    mpf_set_default_prec(precision);
+
+    mpf_t f_series_const;
+    mpf_init(f_series_const);
+    calculate_set_constant(f_series_const);
+
+    //getting (C^3)/24
+    mpz_t C3;
+    mpz_init(C3);
+    mpz_ui_pow_ui(C3, 640320, 3);
+
+    mpz_t C3_OVER_24;
+    mpz_init(C3_OVER_24);
+    mpz_div_ui(C3_OVER_24, C3, 24);
+
+    mpz_t mpz_zero;
+    mpz_init(mpz_zero); //default is 0
+
+    mpz_t mpz_digits;
+    mpz_init_set_ui(mpz_digits, digits);
+
+    mpf_t *P = malloc(sizeof(mpf_t));
+    mpf_init(*P);
+
+    mpf_t *Q = malloc(sizeof(mpf_t));
+    mpf_init(*Q);
+
+    mpf_t *T = malloc(sizeof(mpf_t));
+    mpf_init(*T);
+
+    mpz_t *PQT_ab = binary_split(mpz_zero, mpz_digits, C3_OVER_24);
+    mpf_set_z(*P, PQT_ab[0]);
+    mpf_set_z(*Q, PQT_ab[1]);
+    mpf_set_z(*T, PQT_ab[2]);
+
+    gmp_printf("P: %Zd\n", *P);
+    gmp_printf("Q: %Zd\n", *Q);
+    gmp_printf("T: %Zd\n", *T);
+
+    mpf_t sum;
+    mpf_init(sum);
+    mpf_div(sum, *T, *Q);
+
+    mpf_t calculated_pi;
+    mpf_init(calculated_pi);
+    mpf_mul(calculated_pi, f_series_const, sum);
+    mpf_ui_div(calculated_pi, 1, calculated_pi);
+
+    char *pi_str = malloc(precision+5);
+    mp_exp_t exp;
+    mpf_get_str(pi_str, &exp, 10, precision, calculated_pi);
+
+    mpz_clear(C3);
+    mpz_clear(C3_OVER_24);
+    mpz_clear(mpz_digits);
+    mpf_clear(*P);
+    mpf_clear(*Q);
+    mpf_clear(*T);
+    mpf_clear(f_series_const);
+
+    return pi_str;
+}
+
+static mpz_t* binary_split(mpz_t a, mpz_t b, mpz_t C3_OVER_24) {
+    mpz_t Pab;
+    mpz_init(Pab);
+
+    mpz_t Qab;
+    mpz_init(Qab);
+
+    mpz_t Tab;
+    mpz_init(Tab);
+
+    mpz_t diff;
+    mpz_init(diff);
+    mpz_sub(diff, b, a);
+    if (mpz_cmp_ui(diff, 1)==0) { //directly compute P, Q T
+        if (mpz_cmp_ui(a, 0)==0) {
+            mpz_set_ui(Pab, 1);
+            mpz_set_ui(Qab, 1);
+        }else {
+            calc_Pab(a, &Pab);
+            calc_Qab(a, C3_OVER_24, &Qab);
+        }
+        calc_Tab(a, Pab, &Tab);
+        if (mpz_odd_p(a)) {
+            mpz_neg(Tab, Tab);    
+        }
+    }else {
+        mpz_t midpoint;
+        mpz_init(midpoint);
+        mpz_add(midpoint, a, b);
+        mpz_div_ui(midpoint, midpoint, 2);
+
+        //split from a to m
+        mpz_t *PQT_am = binary_split(a, midpoint, C3_OVER_24);
+
+
+        mpz_t Pam;
+        mpz_init_set(Pam, PQT_am[0]);
+
+        mpz_t Qam;
+        mpz_init_set(Qam, PQT_am[1]);
+
+        mpz_t Tam;
+        mpz_init_set(Tam, PQT_am[2]);
+
+        mpz_clears(PQT_am[0], PQT_am[1], PQT_am[2], NULL);
+        free(PQT_am);
+
+        //split from m to b
+        mpz_t *PQT_mb = binary_split(midpoint, b, C3_OVER_24);
+
+        mpz_t Pmb;
+        mpz_init_set(Pmb, PQT_mb[0]);
+
+        mpz_t Qmb;
+        mpz_init_set(Qmb, PQT_mb[1]);
+
+        mpz_t Tmb;
+        mpz_init_set(Tmb, PQT_mb[2]);
+
+        mpz_clears(PQT_mb[0], PQT_mb[1], PQT_mb[2], NULL);
+        free(PQT_mb);
+
+        //combining P, Q
+        mpz_mul(Pab, Pam, Pmb);
+        mpz_mul(Qab, Qam, Qmb);
+
+        //combining T
+        mpz_t Tab1;
+        mpz_init(Tab1);
+        mpz_mul(Tab1, Qmb, Tam);
+
+        mpz_t Tab2;
+        mpz_init(Tab2);
+        mpz_mul(Tab2, Pam, Tmb);
+
+        mpz_add(Tab, Tab1, Tab2);
+
+        mpz_clear(Pam);
+        mpz_clear(Qam);
+        mpz_clear(Tam);
+        mpz_clear(Pmb);
+        mpz_clear(Qmb);
+        mpz_clear(Tmb);
+        mpz_clear(Tab1);
+        mpz_clear(Tab2);
+    }
+    mpz_clear(diff);
+    mpz_t *PQT = malloc(3*sizeof(mpz_t));
+    mpz_init_set(PQT[0], Pab);
+    mpz_init_set(PQT[1], Qab);
+    mpz_init_set(PQT[2], Tab);
+    return PQT;
+}
+
+static mpz_t* calc_Pab(mpz_t a, mpz_t *Pab) {
+    //term1
+    mpz_t term1;
+    mpz_init(term1);
+    mpz_mul_ui(term1, a, 6);
+    mpz_sub_ui(term1, term1, 5);
+
+    //term2
+    mpz_t term2;
+    mpz_init(term2);
+    mpz_mul_ui(term2, a, 2);
+    mpz_sub_ui(term2, term2, 1);
+
+    //term3
+    mpz_t term3;
+    mpz_init(term3);
+    mpz_mul_ui(term3, a, 6);
+    mpz_sub_ui(term3, term3, 1);
+
+    //final multiplied terms
+    mpz_t Pab_mult;
+    mpz_init(Pab_mult);
+    mpz_mul(Pab_mult, term1, term2);
+    mpz_mul(Pab_mult, Pab_mult, term3);
+
+    mpz_set(*Pab, Pab_mult);
+
+    mpz_clear(term1);
+    mpz_clear(term2);
+    mpz_clear(term3);
+    mpz_clear(Pab_mult);
+}
+
+static mpz_t* calc_Qab(mpz_t a, mpz_t C3_OVER_24, mpz_t *Qab) {
+    mpz_t Qab_calc;
+    mpz_init(Qab_calc);
+    mpz_pow_ui(Qab_calc, a, 3);
+    mpz_mul(Qab_calc, Qab_calc, C3_OVER_24);
+
+    mpz_set(*Qab, Qab_calc);
+
+    mpz_clear(Qab_calc);
+}
+
+static mpz_t* calc_Tab(mpz_t a, mpz_t Pab, mpz_t *Tab) {
+    mpz_t Tab_calc;
+    mpz_init(Tab_calc);
+    mpz_mul_ui(Tab_calc, a, 545140134);
+    mpz_add_ui(Tab_calc, Tab_calc, 13591409);
+    mpz_mul(Tab_calc, Tab_calc, Pab);
+
+    mpz_set(*Tab, Tab_calc);
+
+    mpz_clear(Tab_calc);
 }

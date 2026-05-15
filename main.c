@@ -5,12 +5,13 @@
 #include "calc_accuracy.h"
 
 #define NUM_DIGITS 1000000
-#define ACCURACY 10000
+#define ACCURACY 1000000
 #define DIGITS_PER_LINE 50
 
 int main() {
     printf("Calculating PI...\n");
-    char *pi_str = calc_pi(NUM_DIGITS, ACCURACY);
+    char *pi_str = calc_pi_binary_split(ACCURACY, NUM_DIGITS);
+    //char *pi_str = calc_pi(NUM_DIGITS, ACCURACY);
 
     //writing pi to file
     FILE *pi_file = fopen("pi.txt","w");
