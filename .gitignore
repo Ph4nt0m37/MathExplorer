@@ -59,3 +59,6 @@ dkms.conf
 
 # MPFR library files
 /mpfr-4.2.2
+
+# Generated files
+pi.txt

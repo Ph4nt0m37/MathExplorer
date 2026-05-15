@@ -145,6 +145,10 @@ static void pi_summation(mpf_t *sum_ptr, int max_sum) {
         mpf_clear(numerator_f);
         mpf_clear(denominator_f);
         mpf_clear(quotient);
+
+        float percent_complete = ((double) k/max_sum)*100;
+        if (fmod(percent_complete, 1) == 0)
+            printf("Percent Calculated: %d%%\n", (int) percent_complete);
     }
 
     mpf_set(*sum_ptr, sum);
