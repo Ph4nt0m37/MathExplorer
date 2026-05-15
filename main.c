@@ -1,11 +1,29 @@
 #include <stdio.h>
 #include <math.h>
+#include <string.h>
 #include "calc_pi.h"
 #include "calc_accuracy.h"
 
-int main() {
-    char *pi_str = calc_pi(1024*10, 200);
+#define NUM_BITS 1024000
+#define DIGITS_PER_LINE 50
 
-    printf("Correct Digits: %d\n",get_num_correct_digits(pi_str, PI_10000));
+int main() {
+    printf("Calculating PI...\n");
+    char *pi_str = calc_pi(NUM_BITS, 80000);
+
+    FILE *pi_file = fopen("pi.txt","w");
+
+    int lines_written = 0;
+    char pi_line[DIGITS_PER_LINE+1];
+    while (lines_written < (NUM_BITS/DIGITS_PER_LINE)) {
+        strncpy(pi_line, pi_str+(lines_written*DIGITS_PER_LINE), DIGITS_PER_LINE);
+        pi_line[DIGITS_PER_LINE] = '\0';
+        fprintf(pi_file, "%s\n", pi_line);
+        lines_written++;
+    }
+
+    printf("Done Calculating. Running Accuracy Check...\n");
+
+    printf("Correct Digits: %d\n",get_num_correct_digits(pi_str, PI_100000));
     return 0;
 }
