@@ -32,7 +32,7 @@ char* calc_pi(int precision, int max_sum) {
 
     mpf_t sum;
     mpf_init(sum);
-    //pi_summation(&sum, max_sum);
+    pi_summation(&sum, max_sum);
 
     char *sum_str = malloc(precision+5); //chars are 1 byte so I don't have to use sizeof
     mp_exp_t exp;
