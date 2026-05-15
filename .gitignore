@@ -56,3 +56,6 @@ dkms.conf
 
 # GMP library files
 /gmp-6.3.0
+
+# MPFR library files
+/mpfr-4.2.2
