@@ -5,7 +5,7 @@
 #include "calc_accuracy.h"
 #include <time.h>
 
-#define NUM_DIGITS 1000000000
+#define NUM_DIGITS 1000000
 #define ACCURACY 10000000
 #define DIGITS_PER_LINE 50
 

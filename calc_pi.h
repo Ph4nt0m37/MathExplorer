@@ -5,6 +5,7 @@
 #include <mpfr.h>
 #include <mpf2mpfr.h> //converts all mpf into mpfr
 #include "real_numbers.h"
+#include <stdint.h>
 
 #define PRECISION_PER_DIGIT 3.32192809489
 #define DIGITS_PER_TERM 14.181647462
@@ -12,11 +13,11 @@
 static void calculate_set_constant(mpf_t constant_var);
 char* calc_pi(int precision, int max_sum);
 static void pi_summation(mpf_t *sum_ptr, int max_sum);
-static char* calc_pi_binary_split(int digits);
-static mpz_t* binary_split(mpz_t a, mpz_t b, mpz_t C3_OVER_24, int digits);
-static void calc_Pab(mpz_t a, mpz_t *Pab);
-static void calc_Qab(mpz_t a, mpz_t C3_OVER_24, mpz_t *Qab);
-static void calc_Tab(mpz_t a, mpz_t Pab, mpz_t *Tab);
+char* calc_pi_binary_split(uint64_t digits);
+static void binary_split(mpz_t P, mpz_t Q, mpz_t T, uint64_t a, uint64_t b, mpz_t C3_OVER_24, uint64_t digits);
+static void calc_Pab(uint64_t a, mpz_t Pab);
+static void calc_Qab(uint64_t a, mpz_t C3_OVER_24, mpz_t Qab);
+static void calc_Tab(uint64_t a, mpz_t Pab, mpz_t Tab);
 
 static void calculate_set_constant(mpf_t constant_var) {
     //making series constant
@@ -170,7 +171,7 @@ static void pi_summation(mpf_t *sum_ptr, int max_sum) {
     mpf_set(*sum_ptr, sum);
 }
 
-char* calc_pi_binary_split(int digits) {
+char* calc_pi_binary_split(uint64_t digits) {
     mpf_set_default_prec((digits * PRECISION_PER_DIGIT) + 128);
 
     mpf_t f_series_const;
@@ -186,29 +187,33 @@ char* calc_pi_binary_split(int digits) {
     mpz_init(C3_OVER_24);
     mpz_div_ui(C3_OVER_24, C3, 24);
 
-    mpz_t mpz_zero;
-    mpz_init(mpz_zero); //default is 0
+    uint64_t terms_to_calc =  (digits / DIGITS_PER_TERM) + 10;
 
-    mpz_t mpz_digits;
-    mpz_init_set_ui(mpz_digits, (digits / DIGITS_PER_TERM) + 10);
+    mpz_t P_z;
+    mpz_init(P_z);
 
-    mpf_t *P = malloc(sizeof(mpf_t));
-    mpf_init(*P);
+    mpz_t Q_z;
+    mpz_init(Q_z);
 
-    mpf_t *Q = malloc(sizeof(mpf_t));
-    mpf_init(*Q);
+    mpz_t T_z;
+    mpz_init(T_z);
 
-    mpf_t *T = malloc(sizeof(mpf_t));
-    mpf_init(*T);
+    binary_split(P_z, Q_z, T_z, 0, terms_to_calc, C3_OVER_24, digits);
 
-    mpz_t *PQT_ab = binary_split(mpz_zero, mpz_digits, C3_OVER_24, digits);
-    mpf_set_z(*P, PQT_ab[0]);
-    mpf_set_z(*Q, PQT_ab[1]);
-    mpf_set_z(*T, PQT_ab[2]);
+    //gmp_printf("t: %Zd", T_z);
+
+    mpf_t P;
+    mpfr_init_set_z(P, P_z, MPFR_RNDN);
+
+    mpf_t Q;
+    mpfr_init_set_z(Q, Q_z, MPFR_RNDN);
+
+    mpf_t T;
+    mpfr_init_set_z(T, T_z, MPFR_RNDN);
 
     mpf_t sum;
     mpf_init(sum);
-    mpf_div(sum, *T, *Q);
+    mpf_div(sum, T, Q);
 
     mpf_t calculated_pi;
     mpf_init(calculated_pi);
@@ -219,50 +224,27 @@ char* calc_pi_binary_split(int digits) {
     mp_exp_t exp;
     mpf_get_str(pi_str, &exp, 10, digits, calculated_pi);
 
-    mpz_clear(C3);
-    mpz_clear(C3_OVER_24);
-    mpz_clear(mpz_digits);
-    mpf_clear(*P);
-    free(P);
-    mpf_clear(*Q);
-    free(Q);
-    mpf_clear(*T);
-    free(T);
-    mpf_clear(sum);
-    mpf_clear(calculated_pi);
-    mpf_clear(f_series_const);
-    mpz_clears(PQT_ab[0], PQT_ab[1], PQT_ab[2], NULL);
-    free(PQT_ab);
+    mpz_clears(C3, C3_OVER_24, P_z, Q_z, T_z, NULL);
+    mpf_clears(P, Q, T, sum, calculated_pi, f_series_const, NULL);
 
     return pi_str;
 }
 
-static mpz_t* binary_split(mpz_t a, mpz_t b, mpz_t C3_OVER_24, int digits) {
+static void binary_split(mpz_t P, mpz_t Q, mpz_t T, uint64_t a, uint64_t b, mpz_t C3_OVER_24, uint64_t digits) {
     static int digits_done = 0;
 
-    mpz_t Pab;
-    mpz_init(Pab);
-
-    mpz_t Qab;
-    mpz_init(Qab);
-
-    mpz_t Tab;
-    mpz_init(Tab);
-
-    mpz_t diff;
-    mpz_init(diff);
-    mpz_sub(diff, b, a);
-    if (mpz_cmp_ui(diff, 1)==0) { //directly compute P, Q T
-        if (mpz_cmp_ui(a, 0)==0) {
-            mpz_set_ui(Pab, 1);
-            mpz_set_ui(Qab, 1);
+    uint64_t diff = b - a;
+    if (diff==1) { //directly compute P, Q T
+        if (a==0) {
+            mpz_set_ui(P, 1);
+            mpz_set_ui(Q, 1);
         }else {
-            calc_Pab(a, &Pab);
-            calc_Qab(a, C3_OVER_24, &Qab);
+            calc_Pab(a, P);
+            calc_Qab(a, C3_OVER_24, Q);
         }
-        calc_Tab(a, Pab, &Tab);
-        if (mpz_odd_p(a)) {
-            mpz_neg(Tab, Tab);    
+        calc_Tab(a, P, T);
+        if (a % 2 == 1) { //checking if odd
+            mpz_neg(T, T);    
         }
 
         digits_done += DIGITS_PER_TERM; //add DIGITS_PER_TERM instead of one so the digits done scales correctly
@@ -270,44 +252,23 @@ static mpz_t* binary_split(mpz_t a, mpz_t b, mpz_t C3_OVER_24, int digits) {
         if (fmod(percent_complete, 1) == 0)
             printf("Percent Calculated: %d%%\n", (int) percent_complete);
     }else {
-        mpz_t midpoint;
-        mpz_init(midpoint);
-        mpz_add(midpoint, a, b);
-        mpz_div_ui(midpoint, midpoint, 2);
+        uint64_t midpoint = (a + b)/2;
+
+        mpz_t Pam, Qam, Tam;
+        mpz_inits(Pam, Qam, Tam, NULL);
 
         //split from a to m
-        mpz_t *PQT_am = binary_split(a, midpoint, C3_OVER_24, digits);
+        binary_split(Pam, Qam, Tam, a, midpoint, C3_OVER_24, digits);
 
-        mpz_t Pam;
-        mpz_init_set(Pam, PQT_am[0]);
-
-        mpz_t Qam;
-        mpz_init_set(Qam, PQT_am[1]);
-
-        mpz_t Tam;
-        mpz_init_set(Tam, PQT_am[2]);
-
-        mpz_clears(PQT_am[0], PQT_am[1], PQT_am[2], NULL);
-        free(PQT_am);
+        mpz_t Pmb, Qmb, Tmb;
+        mpz_inits(Pmb, Qmb, Tmb, NULL);
 
         //split from m to b
-        mpz_t *PQT_mb = binary_split(midpoint, b, C3_OVER_24, digits);
-
-        mpz_t Pmb;
-        mpz_init_set(Pmb, PQT_mb[0]);
-
-        mpz_t Qmb;
-        mpz_init_set(Qmb, PQT_mb[1]);
-
-        mpz_t Tmb;
-        mpz_init_set(Tmb, PQT_mb[2]);
-
-        mpz_clears(PQT_mb[0], PQT_mb[1], PQT_mb[2], NULL);
-        free(PQT_mb);
+        binary_split(Pmb, Qmb, Tmb, midpoint, b, C3_OVER_24, digits);
 
         //combining P, Q
-        mpz_mul(Pab, Pam, Pmb);
-        mpz_mul(Qab, Qam, Qmb);
+        mpz_mul(P, Pam, Pmb);
+        mpz_mul(Q, Qam, Qmb);
 
         //combining T
         mpz_t Tab1;
@@ -318,44 +279,29 @@ static mpz_t* binary_split(mpz_t a, mpz_t b, mpz_t C3_OVER_24, int digits) {
         mpz_init(Tab2);
         mpz_mul(Tab2, Pam, Tmb);
 
-        mpz_add(Tab, Tab1, Tab2);
+        mpz_add(T, Tab1, Tab2);
 
-        mpz_clear(Pam);
-        mpz_clear(Qam);
-        mpz_clear(Tam);
-        mpz_clear(Pmb);
-        mpz_clear(Qmb);
-        mpz_clear(Tmb);
-        mpz_clear(Tab1);
-        mpz_clear(Tab2);
-        mpz_clear(midpoint);
+        mpz_clears(Pam, Qam, Tam, Pmb, Qmb, Tmb, Tab1, Tab2, NULL);
     }
-    mpz_clear(diff);
-    mpz_t *PQT = malloc(3*sizeof(mpz_t));
-    mpz_init_set(PQT[0], Pab);
-    mpz_init_set(PQT[1], Qab);
-    mpz_init_set(PQT[2], Tab);
-    mpz_clears(Pab, Qab, Tab, NULL);
-    return PQT;
 }
 
-static void calc_Pab(mpz_t a, mpz_t *Pab) {
+static void calc_Pab(uint64_t a, mpz_t Pab) {
     //term1
     mpz_t term1;
-    mpz_init(term1);
-    mpz_mul_ui(term1, a, 6);
+    mpz_init_set_ui(term1, a);
+    mpz_mul_ui(term1, term1, 6);
     mpz_sub_ui(term1, term1, 5);
 
     //term2
     mpz_t term2;
-    mpz_init(term2);
-    mpz_mul_ui(term2, a, 2);
+    mpz_init_set_ui(term2, a);
+    mpz_mul_ui(term2, term2, 2);
     mpz_sub_ui(term2, term2, 1);
 
     //term3
     mpz_t term3;
-    mpz_init(term3);
-    mpz_mul_ui(term3, a, 6);
+    mpz_init_set_ui(term3, a);
+    mpz_mul_ui(term3, term3, 6);
     mpz_sub_ui(term3, term3, 1);
 
     //final multiplied terms
@@ -364,7 +310,7 @@ static void calc_Pab(mpz_t a, mpz_t *Pab) {
     mpz_mul(Pab_mult, term1, term2);
     mpz_mul(Pab_mult, Pab_mult, term3);
 
-    mpz_set(*Pab, Pab_mult);
+    mpz_set(Pab, Pab_mult);
 
     mpz_clear(term1);
     mpz_clear(term2);
@@ -372,25 +318,25 @@ static void calc_Pab(mpz_t a, mpz_t *Pab) {
     mpz_clear(Pab_mult);
 }
 
-static void calc_Qab(mpz_t a, mpz_t C3_OVER_24, mpz_t *Qab) {
+static void calc_Qab(uint64_t a, mpz_t C3_OVER_24, mpz_t Qab) {
     mpz_t Qab_calc;
-    mpz_init(Qab_calc);
-    mpz_pow_ui(Qab_calc, a, 3);
+    mpz_init_set_ui(Qab_calc, a);
+    mpz_pow_ui(Qab_calc, Qab_calc, 3);
     mpz_mul(Qab_calc, Qab_calc, C3_OVER_24);
 
-    mpz_set(*Qab, Qab_calc);
+    mpz_set(Qab, Qab_calc);
 
     mpz_clear(Qab_calc);
 }
 
-static void calc_Tab(mpz_t a, mpz_t Pab, mpz_t *Tab) {
+static void calc_Tab(uint64_t a, mpz_t Pab, mpz_t Tab) {
     mpz_t Tab_calc;
-    mpz_init(Tab_calc);
-    mpz_mul_ui(Tab_calc, a, 545140134);
+    mpz_init_set_ui(Tab_calc, a);
+    mpz_mul_ui(Tab_calc, Tab_calc, 545140134);
     mpz_add_ui(Tab_calc, Tab_calc, 13591409);
     mpz_mul(Tab_calc, Tab_calc, Pab);
 
-    mpz_set(*Tab, Tab_calc);
+    mpz_set(Tab, Tab_calc);
 
     mpz_clear(Tab_calc);
 }
