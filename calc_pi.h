@@ -10,39 +10,39 @@
 #define PRECISION_PER_DIGIT 3.32192809489
 #define DIGITS_PER_TERM 14.181647462
 
-static void calculate_set_constant(mpf_t constant_var);
+static void calculate_set_constant(mpfr_t constant_var);
 char* calc_pi(int precision, int max_sum);
 static void pi_summation(mpf_t *sum_ptr, int max_sum);
-char* calc_pi_binary_split(uint64_t digits);
+void calc_pi_binary_split(uint64_t digits, int write_to_file);
 static void binary_split(mpz_t P, mpz_t Q, mpz_t T, uint64_t a, uint64_t b, mpz_t C3_OVER_24, uint64_t digits);
 static void calc_Pab(uint64_t a, mpz_t Pab);
 static void calc_Qab(uint64_t a, mpz_t C3_OVER_24, mpz_t Qab);
 static void calc_Tab(uint64_t a, mpz_t Pab, mpz_t Tab);
 
-static void calculate_set_constant(mpf_t constant_var) {
+static void calculate_set_constant(mpfr_t constant_var) {
     //making series constant
-    mpf_t f_series_const;
-    mpf_init(f_series_const);
+    mpfr_t f_series_const;
+    mpfr_init(f_series_const);
 
-    mpf_t num1;
-    mpf_init_set_ui(num1, 426880);
+    mpfr_t num1;
+    mpfr_init_set_ui(num1, 426880, MPFR_RNDN);
 
-    mpf_t num2;
-    mpf_init(num2);
-    mpf_sqrt_ui(num2, 10005);
+    mpfr_t num2;
+    mpfr_init(num2);
+    mpfr_sqrt_ui(num2, 10005, MPFR_RNDN);
     
-    mpf_t const_denom;
-    mpf_init(const_denom);
-    mpf_mul(const_denom, num1, num2);
+    mpfr_t const_denom;
+    mpfr_init(const_denom);
+    mpfr_mul(const_denom, num1, num2, MPFR_RNDN);
 
-    mpf_ui_div(f_series_const, 1, const_denom);
+    mpfr_ui_div(f_series_const, 1, const_denom, MPFR_RNDN);
 
-    mpf_clear(num1);
-    mpf_clear(num2);
-    mpf_clear(const_denom);
+    mpfr_clear(num1);
+    mpfr_clear(num2);
+    mpfr_clear(const_denom);
 
-    mpf_set(constant_var, f_series_const);
-    mpf_clear(f_series_const);
+    mpfr_set(constant_var, f_series_const, MPFR_RNDN);
+    mpfr_clear(f_series_const);
 }
 
 char* calc_pi(int precision, int max_sum) {
@@ -171,11 +171,11 @@ static void pi_summation(mpf_t *sum_ptr, int max_sum) {
     mpf_set(*sum_ptr, sum);
 }
 
-char* calc_pi_binary_split(uint64_t digits) {
+void calc_pi_binary_split(uint64_t digits, int write_to_file) {
     mpf_set_default_prec((digits * PRECISION_PER_DIGIT) + 128);
 
-    mpf_t f_series_const;
-    mpf_init(f_series_const);
+    mpfr_t f_series_const;
+    mpfr_init(f_series_const);
     calculate_set_constant(f_series_const);
 
     //getting (C^3)/24
@@ -200,34 +200,44 @@ char* calc_pi_binary_split(uint64_t digits) {
 
     binary_split(P_z, Q_z, T_z, 0, terms_to_calc, C3_OVER_24, digits);
 
+    printf("done with binary split\n");
+
     //gmp_printf("t: %Zd", T_z);
 
-    mpf_t P;
-    mpfr_init_set_z(P, P_z, MPFR_RNDN);
+    mpz_clears(C3, C3_OVER_24, P_z, NULL);
 
-    mpf_t Q;
+    mpfr_t Q;
     mpfr_init_set_z(Q, Q_z, MPFR_RNDN);
+    mpz_clear(Q_z);
 
-    mpf_t T;
+    mpfr_t T;
     mpfr_init_set_z(T, T_z, MPFR_RNDN);
+    mpz_clear(T_z);
 
-    mpf_t sum;
-    mpf_init(sum);
-    mpf_div(sum, T, Q);
+    mpfr_t sum;
+    mpfr_init(sum);
+    mpfr_div(sum, T, Q, MPFR_RNDN);
 
-    mpf_t calculated_pi;
-    mpf_init(calculated_pi);
-    mpf_mul(calculated_pi, f_series_const, sum);
-    mpf_ui_div(calculated_pi, 1, calculated_pi);
+    printf("done adding\n");
 
-    char *pi_str = malloc(digits+5);
-    mp_exp_t exp;
-    mpf_get_str(pi_str, &exp, 10, digits, calculated_pi);
+    mpfr_clears(T, Q, NULL);
 
-    mpz_clears(C3, C3_OVER_24, P_z, Q_z, T_z, NULL);
-    mpf_clears(P, Q, T, sum, calculated_pi, f_series_const, NULL);
+    mpfr_t calculated_pi;
+    mpfr_init(calculated_pi);
+    mpfr_mul(calculated_pi, f_series_const, sum, MPFR_RNDN);
+    mpfr_ui_div(calculated_pi, 1, calculated_pi, MPFR_RNDN);
 
-    return pi_str;
+    printf("done with calculating pi\n");
+
+    mpfr_clears(sum, f_series_const, NULL);
+
+    if (write_to_file) {
+        FILE *pi_file = fopen("pi.txt","w");
+        mpf_out_str(pi_file, 10, digits, calculated_pi);
+        fclose(pi_file);
+    }
+
+    mpf_clear(calculated_pi);
 }
 
 static void binary_split(mpz_t P, mpz_t Q, mpz_t T, uint64_t a, uint64_t b, mpz_t C3_OVER_24, uint64_t digits) {
