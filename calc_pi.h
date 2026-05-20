@@ -18,6 +18,7 @@ static void binary_split(mpz_t P, mpz_t Q, mpz_t T, uint64_t a, uint64_t b, mpz_
 static void calc_Pab(uint64_t a, mpz_t Pab);
 static void calc_Qab(uint64_t a, mpz_t C3_OVER_24, mpz_t Qab);
 static void calc_Tab(uint64_t a, mpz_t Pab, mpz_t Tab);
+void calc_pi_chunking_binary_split(uint64_t digits, int num_chunks, int write_to_file);
 
 static void calculate_set_constant(mpfr_t constant_var) {
     //making series constant
@@ -200,8 +201,6 @@ void calc_pi_binary_split(uint64_t digits, int write_to_file) {
 
     binary_split(P_z, Q_z, T_z, 0, terms_to_calc, C3_OVER_24, digits);
 
-    printf("done with binary split\n");
-
     //gmp_printf("t: %Zd", T_z);
 
     mpz_clears(C3, C3_OVER_24, P_z, NULL);
@@ -215,27 +214,23 @@ void calc_pi_binary_split(uint64_t digits, int write_to_file) {
     mpz_clear(T_z);
 
     mpfr_t sum;
-    mpfr_init(sum);
+    mpfr_init_set_ui(sum, 0, MPFR_RNDN);
     mpfr_div(sum, T, Q, MPFR_RNDN);
-
-    printf("done adding\n");
 
     mpfr_clears(T, Q, NULL);
 
     mpfr_t calculated_pi;
-    mpfr_init(calculated_pi);
+    mpfr_init_set_ui(calculated_pi, 0, MPFR_RNDN);
     mpfr_mul(calculated_pi, f_series_const, sum, MPFR_RNDN);
     mpfr_ui_div(calculated_pi, 1, calculated_pi, MPFR_RNDN);
 
-    printf("done with calculating pi\n");
-
-    mpfr_clears(sum, f_series_const, NULL);
-
     if (write_to_file) {
         FILE *pi_file = fopen("pi.txt","w");
-        mpf_out_str(pi_file, 10, digits, calculated_pi);
+        mpf_out_str(pi_file, 10, digits, sum);
         fclose(pi_file);
     }
+
+    mpfr_clears(sum, f_series_const, NULL);
 
     mpf_clear(calculated_pi);
 }
@@ -280,18 +275,24 @@ static void binary_split(mpz_t P, mpz_t Q, mpz_t T, uint64_t a, uint64_t b, mpz_
         mpz_mul(P, Pam, Pmb);
         mpz_mul(Q, Qam, Qmb);
 
+        mpz_clears(Qam, Pmb, NULL);
+
         //combining T
         mpz_t Tab1;
         mpz_init(Tab1);
         mpz_mul(Tab1, Qmb, Tam);
 
+        mpz_clears(Qmb, Tam, NULL);
+
         mpz_t Tab2;
         mpz_init(Tab2);
         mpz_mul(Tab2, Pam, Tmb);
 
+        mpz_clears(Pam, Tmb, NULL);
+
         mpz_add(T, Tab1, Tab2);
 
-        mpz_clears(Pam, Qam, Tam, Pmb, Qmb, Tmb, Tab1, Tab2, NULL);
+        mpz_clears(Tab1, Tab2, NULL);
     }
 }
 
@@ -349,4 +350,111 @@ static void calc_Tab(uint64_t a, mpz_t Pab, mpz_t Tab) {
     mpz_set(Tab, Tab_calc);
 
     mpz_clear(Tab_calc);
+}
+
+void calc_pi_chunking_binary_split(uint64_t digits, int num_chunks, int write_to_file) {
+    mpf_set_default_prec((digits * PRECISION_PER_DIGIT) + 128);
+
+    mpfr_t f_series_const;
+    mpfr_init(f_series_const);
+    calculate_set_constant(f_series_const);
+
+    mpfr_printf("const: %.50RNf\n", f_series_const);
+
+    //getting (C^3)/24
+    mpz_t C3;
+    mpz_init(C3);
+    mpz_ui_pow_ui(C3, 640320, 3);
+
+    mpz_t C3_OVER_24;
+    mpz_init(C3_OVER_24);
+    mpz_div_ui(C3_OVER_24, C3, 24);
+
+    uint64_t terms_to_calc =  (digits / DIGITS_PER_TERM) + 10;
+
+    mpz_t P_z;
+    mpz_init(P_z);
+
+    mpz_t Q_z;
+    mpz_init(Q_z);
+
+    mpz_t T_z;
+    mpz_init(T_z);
+
+    mpfr_t P;
+    mpfr_init(P);
+
+    mpfr_t Q;
+    mpfr_init(Q);
+
+    mpfr_t T;
+    mpfr_init(T);
+
+    mpfr_t split_sum;
+    mpfr_init(split_sum);
+
+    mpfr_t split_P;
+    mpfr_init(split_P);
+
+    mpfr_t split_Q;
+    mpfr_init(split_Q);
+
+    mpfr_t split_T;
+    mpfr_init(split_T);
+
+    mpfr_t sum;
+    mpfr_init_set_ui(sum, 0, MPFR_RNDN);
+
+    uint64_t terms_per_chunk = terms_to_calc / num_chunks;
+
+    for (int i=0;i<num_chunks;i++) {
+        uint64_t starting_term = terms_per_chunk * i;
+        uint64_t ending_term = starting_term + terms_per_chunk;
+
+        binary_split(P_z, Q_z, T_z, starting_term, ending_term, C3_OVER_24, digits);
+
+        mpfr_set_z(split_P, P_z, MPFR_RNDN);
+        mpfr_mul(P, P, split_P, MPFR_RNDN);
+
+        mpfr_set_z(split_Q, Q_z, MPFR_RNDN);
+        mpfr_mul(Q, Q, split_Q, MPFR_RNDN);
+
+        mpfr_set_z(split_T, T_z, MPFR_RNDN);
+        
+        //combining T //TODO: finish combining things
+        mpz_t term1;
+        mpz_init(term1);
+        mpz_mul(term1, term1, Tam);
+
+        mpz_clears(Qmb, Tam, NULL);
+
+        mpz_t Tab2;
+        mpz_init(Tab2);
+        mpz_mul(Tab2, Pam, Tmb);
+
+        mpfr_div(split_sum, T, Q, MPFR_RNDN);
+
+        mpfr_add(sum, sum, split_sum, MPFR_RNDN);
+    }
+
+    //gmp_printf("t: %Zd", T_z);
+
+    mpz_clears(C3, C3_OVER_24, P_z, Q_z, T_z, NULL);
+
+    mpfr_clears(T, Q, split_sum, NULL);
+
+    mpfr_t calculated_pi;
+    mpfr_init(calculated_pi);
+    mpfr_mul(calculated_pi, f_series_const, sum, MPFR_RNDN);
+    mpfr_ui_div(calculated_pi, 1, calculated_pi, MPFR_RNDN);
+
+    if (write_to_file) {
+        FILE *pi_file = fopen("pi.txt","w");
+        mpf_out_str(pi_file, 10, digits, sum);
+        fclose(pi_file);
+    }
+
+    mpfr_clears(sum, f_series_const, NULL);
+
+    mpf_clear(calculated_pi);
 }
