@@ -373,37 +373,22 @@ void calc_pi_chunking_binary_split(uint64_t digits, int num_chunks, int write_to
     uint64_t terms_to_calc =  (digits / DIGITS_PER_TERM) + 10;
 
     mpz_t P_z;
-    mpz_init(P_z);
+    mpz_init_set_ui(P_z, 1);
 
     mpz_t Q_z;
-    mpz_init(Q_z);
+    mpz_init_set_ui(Q_z, 1);
 
     mpz_t T_z;
     mpz_init(T_z);
 
-    mpfr_t P;
-    mpfr_init(P);
+    mpz_t split_P_z;
+    mpz_init_set_ui(split_P_z, 1);
 
-    mpfr_t Q;
-    mpfr_init(Q);
+    mpz_t split_Q_z;
+    mpz_init_set_ui(split_Q_z, 1);
 
-    mpfr_t T;
-    mpfr_init(T);
-
-    mpfr_t split_sum;
-    mpfr_init(split_sum);
-
-    mpfr_t split_P;
-    mpfr_init(split_P);
-
-    mpfr_t split_Q;
-    mpfr_init(split_Q);
-
-    mpfr_t split_T;
-    mpfr_init(split_T);
-
-    mpfr_t sum;
-    mpfr_init_set_ui(sum, 0, MPFR_RNDN);
+    mpz_t split_T_z;
+    mpz_init(split_T_z);
 
     uint64_t terms_per_chunk = terms_to_calc / num_chunks;
 
@@ -411,46 +396,57 @@ void calc_pi_chunking_binary_split(uint64_t digits, int num_chunks, int write_to
         uint64_t starting_term = terms_per_chunk * i;
         uint64_t ending_term = starting_term + terms_per_chunk;
 
-        binary_split(P_z, Q_z, T_z, starting_term, ending_term, C3_OVER_24, digits);
-
-        mpfr_set_z(split_P, P_z, MPFR_RNDN);
-        mpfr_mul(P, P, split_P, MPFR_RNDN);
-
-        mpfr_set_z(split_Q, Q_z, MPFR_RNDN);
-        mpfr_mul(Q, Q, split_Q, MPFR_RNDN);
-
-        mpfr_set_z(split_T, T_z, MPFR_RNDN);
+        binary_split(split_P_z, split_Q_z, split_T_z, starting_term, ending_term, C3_OVER_24, digits);
         
-        //combining T //TODO: finish combining things
+        //combining T
         mpz_t term1;
         mpz_init(term1);
-        mpz_mul(term1, term1, Tam);
+        mpz_mul(term1, T_z, split_Q_z);
 
-        mpz_clears(Qmb, Tam, NULL);
+        mpz_t term2;
+        mpz_init(term2);
+        mpz_mul(term2, P_z, split_T_z);
 
-        mpz_t Tab2;
-        mpz_init(Tab2);
-        mpz_mul(Tab2, Pam, Tmb);
+        mpz_add(T_z, term1, term2);
 
-        mpfr_div(split_sum, T, Q, MPFR_RNDN);
+        mpz_clears(term1, term2, NULL);
 
-        mpfr_add(sum, sum, split_sum, MPFR_RNDN);
+        mpz_mul(P_z, P_z, split_P_z);
+        mpz_mul(Q_z, Q_z, split_Q_z);
     }
 
     //gmp_printf("t: %Zd", T_z);
 
-    mpz_clears(C3, C3_OVER_24, P_z, Q_z, T_z, NULL);
+    mpz_clears(C3, C3_OVER_24, split_P_z, split_Q_z, split_T_z, P_z, NULL);
 
-    mpfr_clears(T, Q, split_sum, NULL);
+    mpfr_t Q;
+    mpfr_init_set_z(Q, Q_z, MPFR_RNDN);
+
+    mpfr_t T;
+    mpfr_init_set_z(T, T_z, MPFR_RNDN);
+
+    // gmp_printf("Qz: %Zd\n", Q_z);
+    // gmp_printf("Tz: %Zd\n", T_z);
+
+    mpfr_printf("Q: %.50Rf\n", Q);
+    mpfr_printf("T: %.50Rf\n", T);
+
+    mpz_clears(Q_z, T_z, NULL);
+
+    mpfr_t sum;
+    mpfr_init_set_ui(sum, 0, MPFR_RNDN);
+    mpfr_div(sum, T, Q, MPFR_RNDN);
+
+    mpfr_clears(T, Q, NULL);
 
     mpfr_t calculated_pi;
-    mpfr_init(calculated_pi);
+    mpfr_init_set_ui(calculated_pi, 0, MPFR_RNDN);
     mpfr_mul(calculated_pi, f_series_const, sum, MPFR_RNDN);
     mpfr_ui_div(calculated_pi, 1, calculated_pi, MPFR_RNDN);
 
     if (write_to_file) {
         FILE *pi_file = fopen("pi.txt","w");
-        mpf_out_str(pi_file, 10, digits, sum);
+        mpf_out_str(pi_file, 10, digits, calculated_pi);
         fclose(pi_file);
     }
 
