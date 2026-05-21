@@ -165,11 +165,14 @@ static void pi_summation(mpf_t *sum_ptr, int max_sum) {
         mpf_clear(quotient);
 
         float percent_complete = ((double) k/max_sum)*100;
-        if (fmod(percent_complete, 1) == 0)
-            printf("Percent Calculated: %d%%\n", (int) percent_complete);
+        if (fmod(percent_complete, 1) == 0) {
+            printf("Percent Calculated: %d%%\r", (int) percent_complete);
+            fflush(stdout);
+        }
     }
 
     mpf_set(*sum_ptr, sum);
+    printf("\n");
 }
 
 void calc_pi_binary_split(uint64_t digits, int write_to_file) {
@@ -203,6 +206,7 @@ void calc_pi_binary_split(uint64_t digits, int write_to_file) {
     mpz_init(T_z);
 
     binary_split(P_z, Q_z, T_z, 0, terms_to_calc, C3_OVER_24, digits);
+    printf("\n");
 
     //gmp_printf("t: %Zd", T_z);
 
@@ -257,8 +261,10 @@ static void binary_split(mpz_t P, mpz_t Q, mpz_t T, uint64_t a, uint64_t b, mpz_
 
         digits_done += DIGITS_PER_TERM; //add DIGITS_PER_TERM instead of one so the digits done scales correctly
         float percent_complete = ((double) digits_done/digits)*100;
-        if (fmod(percent_complete, 1) == 0)
-            printf("Percent Calculated: %d%%\n", (int) percent_complete);
+        if (fmod(percent_complete, 1) == 0) {
+            printf("Percent Calculated: %d%%\r", (int) percent_complete);
+            fflush(stdout);
+        }
     }else {
         uint64_t midpoint = (a + b)/2;
 
@@ -422,6 +428,7 @@ void calc_pi_chunking_binary_split(uint64_t digits, int num_chunks, int write_to
         mpz_mul(Q_z, Q_z, split_Q_z);
     }
 
+    printf("\n");
     //gmp_printf("t: %Zd", T_z);
 
     mpz_clears(C3, C3_OVER_24, split_P_z, split_Q_z, split_T_z, P_z, NULL);

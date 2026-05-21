@@ -36,8 +36,10 @@ void calc_e(uint64_t digits, int write_to_file) {
 
         digits_calculated++;
         float percent_complete = ((double) digits_calculated/digits)*100;
-        if (fmod(percent_complete, 1) == 0)
-            printf("Percent Calculated: %d%%\n", (int) percent_complete);
+        if (fmod(percent_complete, 1) == 0) {
+            printf("Percent Calculated: %d%%\r", (int) percent_complete);
+            fflush(stdout);
+        }
     }
 
     if (write_to_file) {
@@ -47,4 +49,6 @@ void calc_e(uint64_t digits, int write_to_file) {
     }
 
     mpfr_clear(eulers);
+
+    printf("\n");
 }
