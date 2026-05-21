@@ -2,10 +2,11 @@
 #include <math.h>
 #include <string.h>
 #include "calc_pi.h"
+#include "calc_e.h"
 #include "calc_accuracy.h"
 #include <time.h>
 
-#define NUM_DIGITS 1000000000
+#define NUM_DIGITS 100000
 #define ACCURACY 10000000
 #define DIGITS_PER_LINE 50
 
@@ -13,7 +14,8 @@ int main() {
     printf("Calculating PI...\n");
 
     clock_t begin = clock();
-    calc_pi_chunking_binary_split(NUM_DIGITS, 20, 1); //for some reason parameters are swapped
+    //calc_pi_chunking_binary_split(NUM_DIGITS, 20, 1);
+    calc_e(NUM_DIGITS, 1);
     //char *pi_str = calc_pi(NUM_DIGITS, ACCURACY);
     clock_t end = clock();
 
