@@ -359,7 +359,7 @@ void calc_pi_chunking_binary_split(uint64_t digits, int num_chunks, int write_to
     mpfr_init(f_series_const);
     calculate_set_constant(f_series_const);
 
-    mpfr_printf("const: %.50RNf\n", f_series_const);
+    //mpfr_printf("const: %.50RNf\n", f_series_const);
 
     //getting (C^3)/24
     mpz_t C3;
@@ -428,8 +428,8 @@ void calc_pi_chunking_binary_split(uint64_t digits, int num_chunks, int write_to
     // gmp_printf("Qz: %Zd\n", Q_z);
     // gmp_printf("Tz: %Zd\n", T_z);
 
-    mpfr_printf("Q: %.50Rf\n", Q);
-    mpfr_printf("T: %.50Rf\n", T);
+    //mpfr_printf("Q: %.50Rf\n", Q);
+    //mpfr_printf("T: %.50Rf\n", T);
 
     mpz_clears(Q_z, T_z, NULL);
 
