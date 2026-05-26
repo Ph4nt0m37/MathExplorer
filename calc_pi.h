@@ -165,15 +165,21 @@ static void pi_summation(mpf_t *sum_ptr, int max_sum) {
         mpf_clear(quotient);
 
         float percent_complete = ((double) k/max_sum)*100;
-        if (fmod(percent_complete, 1) == 0)
-            printf("Percent Calculated: %d%%\n", (int) percent_complete);
+        if (fmod(percent_complete, 1) == 0) {
+            printf("Percent Calculated: %d%%\r", (int) percent_complete);
+            fflush(stdout);
+        }
     }
 
     mpf_set(*sum_ptr, sum);
+    printf("\n");
 }
 
 void calc_pi_binary_split(uint64_t digits, int write_to_file) {
     mpf_set_default_prec((digits * PRECISION_PER_DIGIT) + 128);
+
+    mpfr_set_emax(MPFR_EMAX_MAX);
+    mpfr_set_emin(MPFR_EMIN_MIN);
 
     mpfr_t f_series_const;
     mpfr_init(f_series_const);
@@ -200,6 +206,7 @@ void calc_pi_binary_split(uint64_t digits, int write_to_file) {
     mpz_init(T_z);
 
     binary_split(P_z, Q_z, T_z, 0, terms_to_calc, C3_OVER_24, digits);
+    printf("\n");
 
     //gmp_printf("t: %Zd", T_z);
 
@@ -254,8 +261,10 @@ static void binary_split(mpz_t P, mpz_t Q, mpz_t T, uint64_t a, uint64_t b, mpz_
 
         digits_done += DIGITS_PER_TERM; //add DIGITS_PER_TERM instead of one so the digits done scales correctly
         float percent_complete = ((double) digits_done/digits)*100;
-        if (fmod(percent_complete, 1) == 0)
-            printf("Percent Calculated: %d%%\n", (int) percent_complete);
+        if (fmod(percent_complete, 1) == 0) {
+            printf("Percent Calculated: %d%%\r", (int) percent_complete);
+            fflush(stdout);
+        }
     }else {
         uint64_t midpoint = (a + b)/2;
 
@@ -353,7 +362,11 @@ static void calc_Tab(uint64_t a, mpz_t Pab, mpz_t Tab) {
 }
 
 void calc_pi_chunking_binary_split(uint64_t digits, int num_chunks, int write_to_file) {
-    mpf_set_default_prec((digits * PRECISION_PER_DIGIT) + 128);
+    uint64_t precision = (digits * PRECISION_PER_DIGIT) + 128;
+    mpf_set_default_prec(precision);
+
+    mpfr_set_emax(MPFR_EMAX_MAX);
+    mpfr_set_emin(MPFR_EMIN_MIN);
 
     mpfr_t f_series_const;
     mpfr_init(f_series_const);
@@ -415,21 +428,34 @@ void calc_pi_chunking_binary_split(uint64_t digits, int num_chunks, int write_to
         mpz_mul(Q_z, Q_z, split_Q_z);
     }
 
+    printf("\n");
     //gmp_printf("t: %Zd", T_z);
 
     mpz_clears(C3, C3_OVER_24, split_P_z, split_Q_z, split_T_z, P_z, NULL);
 
     mpfr_t Q;
-    mpfr_init_set_z(Q, Q_z, MPFR_RNDN);
+    mpfr_init2(Q, precision * 2);
+    mpfr_set_z(Q, Q_z, MPFR_RNDN);
+    //mpfr_init_set_z(Q, Q_z, MPFR_RNDN);
 
     mpfr_t T;
-    mpfr_init_set_z(T, T_z, MPFR_RNDN);
+    mpfr_init2(T, precision * 2);
+    mpfr_set_z(T, T_z, MPFR_RNDN);
+    //mpfr_init_set_z(T, T_z, MPFR_RNDN);
 
-    // gmp_printf("Qz: %Zd\n", Q_z);
-    // gmp_printf("Tz: %Zd\n", T_z);
+    // if (mpz_sgn(Q_z)==0) {
+    //     printf("Q_z is 0\n");
+    // }else {
+    //     printf("Q_z is NOT 0\n");
+    // }
+    // if (mpz_sgn(T_z)==0) {
+    //     printf("T_z is 0\n");
+    // }else {
+    //     printf("T_z is NOT 0\n");
+    // }
 
-    //mpfr_printf("Q: %.50Rf\n", Q);
-    //mpfr_printf("T: %.50Rf\n", T);
+    // mpfr_printf("Q: %.50Rf\n", Q);
+    // mpfr_printf("T: %.50Rf\n", T);
 
     mpz_clears(Q_z, T_z, NULL);
 
