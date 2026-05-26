@@ -7,8 +7,13 @@
 #include <limits.h>
 #include <time.h>
 #include <pthread.h>
+#include <stdint.h>
+#include <stdarg.h>
+
+
 
 #include "../calc_pi.h"
+#include "../helpers.h"
 
 #define WINDOW_WIDTH 800
 #define WINDOW_HEIGHT 400
@@ -19,12 +24,23 @@
 #define ACCURACY 10000000
 #define DIGITS_PER_LINE 50
 
-void* start_calculation(void* arg);
+//printing stuff
+#define MAX_PRINTF_LENGTH 4095
 
-int main()
+#include "gui.h"
+
+char *display_value;
+unsigned int display_value_max_len;
+unsigned int display_value_len;
+
+void start_gui()
 {
     InitWindow(WINDOW_WIDTH, WINDOW_HEIGHT, "raygui - controls test suite");
     SetTargetFPS(60);
+
+    display_value = calloc(1024, 1);
+    display_value_max_len = 1024;
+    display_value_len = 0;
 
     int width = GetScreenWidth();
     int height = GetScreenHeight();
@@ -42,8 +58,6 @@ int main()
     int activeTab = 0;
 
     float progressbar_value = 0;
-
-    char *display_value = calloc(1000, 1); //max size of 1000
 
     while (!WindowShouldClose())
     {
@@ -88,7 +102,8 @@ int main()
                 GuiValueBox(num_digits_inp, NULL, &num_digits, 1, LONG_MAX, true);
                 if (GuiButton(calc_button, "Calculate")==true) {
                     pthread_t calc_thread;
-                    pthread_create(&calc_thread, NULL, start_calculation, NULL);
+                    run_calculation_args args = {num_digits, display_value, &display_value_max_len, &display_value_len};
+                    pthread_create(&calc_thread, NULL, start_calculation, &args);
                 }
 
                 GuiProgressBar(progress_bar, "Percent Calculated:\t", "100%", &progressbar_value, 0, 100);
@@ -104,20 +119,32 @@ int main()
     }
 
     CloseWindow();
-    return 0;
 }
 
-void* start_calculation(void* arg) {
-    printf("Calculating PI...\n");
+static void* start_calculation(void* func_args) {
+    run_calculation_args args = *((run_calculation_args*) func_args);
+    uint64_t num_digits = args.num_digits;
+
+    str_append(args.display_str, "Calculating PI...\n", args.display_str_max_len, args.display_str_len, sizeof("Calculating PI...\n"));
 
     clock_t begin = clock();
-    calc_pi_chunking_binary_split(NUM_DIGITS, 20, 1); //for some reason parameters are swapped
+    calc_pi_chunking_binary_split(num_digits, 20, 1); //for some reason parameters are swapped
     //char *pi_str = calc_pi(NUM_DIGITS, ACCURACY);
     clock_t end = clock();
 
     double calculation_time = (double) (end-begin)/CLOCKS_PER_SEC;
 
-    printf("done calculating!\n");
+    char digits_calc_text[200] = {0}; //200 digits should be more than enough
+    snprintf(digits_calc_text, sizeof(digits_calc_text), "Digits Calculated: %ld. Time taken: %f.\n", num_digits, calculation_time);
 
-    printf("Digits Calculated: %d. Time taken: %f.\n", NUM_DIGITS, calculation_time);
+    str_append(args.display_str, digits_calc_text, args.display_str_max_len, args.display_str_len, sizeof(digits_calc_text));
+    str_append(args.display_str, "Output written to pi.txt\n", args.display_str_max_len, args.display_str_len, sizeof("Output written to pi.txt\n"));
+}
+
+void print_to_calc_box(char* str) {
+    if (strchr(str, '\r')!=NULL) {
+        str_inv_set_line(display_value, str, 1, &display_value_max_len, &display_value_len, sizeof(str));
+    }else {
+        str_append(display_value, str, &display_value_max_len, &display_value_len, sizeof(str));
+    }
 }
