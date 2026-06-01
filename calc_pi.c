@@ -57,6 +57,8 @@ char* calc_pi(int precision, int max_sum) {
     mpf_clear(sum);
     mpf_clear(f_series_const);
 
+    update_calc_progress_bar(100);
+
     return pi_str;
 }
 
@@ -145,10 +147,11 @@ static void pi_summation(mpf_t *sum_ptr, int max_sum) {
         mpf_clear(quotient);
 
         float percent_complete = ((double) k/max_sum)*100;
+        update_calc_progress_bar(percent_complete);
         if (fmod(percent_complete, 1) == 0) {
-            char percent_calc_text[30] = {0}; //30 digits should be more than enough
-            snprintf(percent_calc_text, sizeof(percent_calc_text), "Percent Calculated: %d%%", (int) percent_complete);
-            print_to_calc_box(percent_calc_text);
+            char percent_calc_text[50] = {0}; //50 digits should be more than enough
+            snprintf(percent_calc_text, sizeof(percent_calc_text), "Percent Calculated: %d%%\r", (int) percent_complete);
+            print_to_calc_box(percent_calc_text, sizeof(percent_calc_text));
             fflush(stdout);
         }
     }
@@ -213,6 +216,8 @@ void calc_pi_binary_split(uint64_t digits, int write_to_file) {
     mpfr_mul(calculated_pi, f_series_const, sum, MPFR_RNDN);
     mpfr_ui_div(calculated_pi, 1, calculated_pi, MPFR_RNDN);
 
+    update_calc_progress_bar(100);
+
     if (write_to_file) {
         FILE *pi_file = fopen("pi.txt","w");
         mpf_out_str(pi_file, 10, digits, sum);
@@ -243,10 +248,11 @@ static void binary_split(mpz_t P, mpz_t Q, mpz_t T, uint64_t a, uint64_t b, mpz_
 
         digits_done += DIGITS_PER_TERM; //add DIGITS_PER_TERM instead of one so the digits done scales correctly
         float percent_complete = ((double) digits_done/digits)*100;
+        update_calc_progress_bar(percent_complete);
         if (fmod(percent_complete, 1) == 0) {
-            char percent_calc_text[30] = {0}; //30 digits should be more than enough
+            char percent_calc_text[50] = {0}; //50 digits should be more than enough
             snprintf(percent_calc_text, sizeof(percent_calc_text), "Percent Calculated: %d%%\r", (int) percent_complete);
-            print_to_calc_box(percent_calc_text);
+            print_to_calc_box(percent_calc_text, sizeof(percent_calc_text));
             fflush(stdout);
         }
     }else {
@@ -412,7 +418,7 @@ void calc_pi_chunking_binary_split(uint64_t digits, int num_chunks, int write_to
         mpz_mul(Q_z, Q_z, split_Q_z);
     }
 
-    print_to_calc_box("\n");
+    print_to_calc_box("\n", sizeof("\n"));
     //gmp_printf("t: %Zd", T_z);
 
     mpz_clears(C3, C3_OVER_24, split_P_z, split_Q_z, split_T_z, P_z, NULL);
@@ -453,6 +459,8 @@ void calc_pi_chunking_binary_split(uint64_t digits, int num_chunks, int write_to
     mpfr_init_set_ui(calculated_pi, 0, MPFR_RNDN);
     mpfr_mul(calculated_pi, f_series_const, sum, MPFR_RNDN);
     mpfr_ui_div(calculated_pi, 1, calculated_pi, MPFR_RNDN);
+
+    update_calc_progress_bar(100);
 
     if (write_to_file) {
         FILE *pi_file = fopen("pi.txt","w");

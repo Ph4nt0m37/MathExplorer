@@ -2,6 +2,7 @@
 #define GUI_HEADER
 
 #include <stdint.h>
+#include "raylib.h"
 
 typedef struct {
     uint64_t num_digits;
@@ -10,8 +11,17 @@ typedef struct {
     unsigned int *display_str_len;
 } run_calculation_args;
 
+typedef struct {
+    unsigned int width;
+    unsigned int height;
+    unsigned int max_iterations;
+    Image *image;
+} draw_mandelbrot_args;
+
 void start_gui();
 static void* start_calculation(void* arg);
-void print_to_calc_box(char* str);
+void print_to_calc_box(char* str, int str_size);
+void update_calc_progress_bar(float value);
+static void* draw_mandelbrot_img(void* func_args);
 
 #endif

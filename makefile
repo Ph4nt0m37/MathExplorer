@@ -1,0 +1,2 @@
+all: main.c calc_pi.c helpers.c mandelbrot.c complex_number.c GUI/gui.c
+	gcc -O3 main.c calc_pi.c helpers.c mandelbrot.c complex_number.c GUI/gui.c -o MathExplorer -lmpfr -lgmp -lm -lpthread -lraylib -lGL -ldl -lrt -lX11 -g -Wno-format-truncation -Wno-unused-result
