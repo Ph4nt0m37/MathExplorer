@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 #include "raylib.h"
+#include "../complex_number.h"
 
 typedef struct {
     uint64_t num_digits;
@@ -14,6 +15,9 @@ typedef struct {
 typedef struct {
     unsigned int width;
     unsigned int height;
+    ldouble re_center;
+    ldouble im_center;
+    double zoom;
     unsigned int max_iterations;
     Image *image;
 } draw_mandelbrot_args;

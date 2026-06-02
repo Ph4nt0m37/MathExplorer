@@ -58,6 +58,8 @@ void start_gui()
     long num_digits = 10;
     bool clear = true;
 
+    double mandelbrot_zoom = 1;
+
     char *tabs[3] = { "Calculate", "Mandelbrot", "Noise" };
     int activeTab = 0;
 
@@ -119,11 +121,15 @@ void start_gui()
                 if (clear) {
                     ClearBackground(GetColor(GuiGetStyle(DEFAULT, BACKGROUND_COLOR)));
                 }
-                if (GuiButton((Rectangle){center.x-(125/2), 30, 125, 30}, "Draw")==true) {
+                if (IsKeyPressed(KEY_Z)) {
+                    mandelbrot_zoom *= 5;
+                }
+                if (GuiButton((Rectangle){center.x-(125/2), 30, 125, 30}, "Draw")==true || IsKeyPressed(KEY_Z)) {
+                    ClearBackground(GetColor(GuiGetStyle(DEFAULT, BACKGROUND_COLOR)));
                     clear = false;
                     pthread_t draw_mandelbrot_thread;
                     Image mandelbrot_image = GenImageColor(width, height, WHITE);
-                    draw_mandelbrot_args args = {width, height, 100, &mandelbrot_image};
+                    draw_mandelbrot_args args = {width, height, 0.743643887037151, 0.131825904205330, mandelbrot_zoom, 500, &mandelbrot_image};
                     pthread_create(&draw_mandelbrot_thread, NULL, draw_mandelbrot_img, &args);
                     pthread_join(draw_mandelbrot_thread, NULL);
                     Texture2D mandelbrot_texture = LoadTextureFromImage(mandelbrot_image);
@@ -175,16 +181,19 @@ static void* draw_mandelbrot_img(void* func_args) {
     draw_mandelbrot_args args = *((draw_mandelbrot_args*) func_args);
     unsigned int width = args.width;
     unsigned int height = args.height;
+    ldouble re_center = args.re_center;
+    ldouble im_center = args.im_center;
+    int zoom = args.zoom;
     unsigned int max_iterations = args.max_iterations;
     Image *mandelbrot_image = args.image;
 
-    int min_re = -2;
-    int max_re = 1;
-    int min_im = -1;
-    int max_im = 1;
+    ldouble min_re = -2.0/zoom - re_center;
+    ldouble max_re = 1.0/zoom - re_center;
+    ldouble min_im = -1.0/zoom - im_center;
+    ldouble max_im = 1.0/zoom - im_center;
 
-    double re_step = (max_re - min_re) / (double) width;
-    double im_step = (max_im - min_im) / (double) height;
+    ldouble re_step = (max_re - min_re) / (double) width;
+    ldouble im_step = (max_im - min_im) / (double) height;
 
     Color *mandelbrot_pixels = (Color *) mandelbrot_image->data;
 
@@ -205,24 +214,6 @@ static void* draw_mandelbrot_img(void* func_args) {
             }
         }
     }
-
-    // ldouble re = min_re;
-    // while (re < max_re) {
-    //     ldouble im = min_im;
-    //     while (im < max_im) {
-    //         int x = (re - min_re) / re_step;
-    //         int y = (im - min_im) / im_step;
-    //         //printf("re: %Lf | im: %Lf\n",re, im);
-    //         complex_number num = {re, im};
-    //         if (in_set(num, max_iterations)) {
-    //             mandelbrot_pixels[width * y + x] = BLACK;
-    //         }
-    //         im+=im_step;
-    //     }
-    //     re+=re_step;
-    // }
-
-    printf("done calc\n");
 
     pthread_exit(0);
 }
