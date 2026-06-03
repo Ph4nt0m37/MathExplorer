@@ -20,6 +20,7 @@ typedef struct {
     double zoom;
     unsigned int max_iterations;
     Image *image;
+    volatile bool *rendering_done;
 } draw_mandelbrot_args;
 
 void start_gui();

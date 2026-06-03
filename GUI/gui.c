@@ -59,6 +59,11 @@ void start_gui()
     bool clear = true;
 
     double mandelbrot_zoom = 1;
+    unsigned int zoom_iterations = 1;
+    volatile bool rendering_done = false;
+
+    Image mandelbrot_image = GenImageColor(width, height, WHITE);
+    Texture2D mandelbrot_texture = LoadTextureFromImage(mandelbrot_image);
 
     char *tabs[3] = { "Calculate", "Mandelbrot", "Noise" };
     int activeTab = 0;
@@ -71,10 +76,15 @@ void start_gui()
         height = GetScreenHeight();
         Vector2 center = {width/2, height/2};
 
+        //mouse position
+        int mouse_x = GetMouseX();
+        int mouse_y = GetMouseY();
+
         //settings positions
         Vector2 settings_box_pos = {width-140-10, 40};
         Rectangle settings_box_rect = (Rectangle){ settings_box_pos.x, settings_box_pos.y, 140, 300 };
 
+        //calculate tab stuff
         Rectangle binary_split_checkbox = (Rectangle){ settings_box_pos.x+10, settings_box_pos.y+10, CHECKBOX_SIZE, CHECKBOX_SIZE };
 
         Rectangle chunking_checkbox = (Rectangle){ settings_box_pos.x+10, settings_box_pos.y + 15 + CHECKBOX_SIZE, CHECKBOX_SIZE, CHECKBOX_SIZE };
@@ -89,12 +99,16 @@ void start_gui()
         Vector2 output_box_pos = {15, progress_bar.y+progress_bar.height+15};
         Rectangle output_box = (Rectangle){output_box_pos.x, output_box_pos.y, width-175, height-output_box_pos.y-15};
 
+        //mandelbrot stuff
+        Rectangle zoom_amount_label = (Rectangle){5, settings_box_pos.y, 225, 30};
+
         // Draw
         //----------------------------------------------------------------------------------
         BeginDrawing();
 
             GuiTabBar((Rectangle){ 0, 0, width, 30 }, tabs, 3, 0, &activeTab);
             if (activeTab==0) {
+                clear = true;
                 ClearBackground(GetColor(GuiGetStyle(DEFAULT, BACKGROUND_COLOR)));
                 GuiGroupBox(settings_box_rect, "Settings");
                 GuiCheckBox(binary_split_checkbox, "Binary Split", &binary_split);
@@ -121,19 +135,38 @@ void start_gui()
                 if (clear) {
                     ClearBackground(GetColor(GuiGetStyle(DEFAULT, BACKGROUND_COLOR)));
                 }
-                if (IsKeyPressed(KEY_Z)) {
-                    mandelbrot_zoom *= 5;
+                if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && GuiButton((Rectangle){center.x-(125/2), 30, 125, 30}, "Draw")==false) {
+                    
                 }
-                if (GuiButton((Rectangle){center.x-(125/2), 30, 125, 30}, "Draw")==true || IsKeyPressed(KEY_Z)) {
-                    ClearBackground(GetColor(GuiGetStyle(DEFAULT, BACKGROUND_COLOR)));
+                if (GuiButton((Rectangle){center.x-(125/2), 30, 125, 30}, "Draw")==true || IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
                     clear = false;
                     pthread_t draw_mandelbrot_thread;
-                    Image mandelbrot_image = GenImageColor(width, height, WHITE);
-                    draw_mandelbrot_args args = {width, height, 0.743643887037151, 0.131825904205330, mandelbrot_zoom, 500, &mandelbrot_image};
+                    mandelbrot_image = GenImageColor(width, height, WHITE);
+                    //some cool coordinates for below: 0.743643887037151, 0.131825904205330i
+                    draw_mandelbrot_args args = {width, height, 0.743643887037151, 0.131825904205330, mandelbrot_zoom, zoom_iterations*100, &mandelbrot_image, &rendering_done};
+                    if (GuiButton((Rectangle){center.x-(125/2), 30, 125, 30}, "Draw")==false) { //if this is false, it means that the left mouse button was pressed and the "Draw" button wasn't
+                        mandelbrot_zoom *= 5;
+                        zoom_iterations *= 2;
+                        args.re_center = (mouse_x / (double) width)*3 - 2;
+                        args.im_center = (mouse_y / (double) height)*2 - 1;
+                        printf("re_center: %Lf\n", args.re_center);
+                        printf("im_center: %Lf\n", args.im_center);
+                    }
                     pthread_create(&draw_mandelbrot_thread, NULL, draw_mandelbrot_img, &args);
-                    pthread_join(draw_mandelbrot_thread, NULL);
-                    Texture2D mandelbrot_texture = LoadTextureFromImage(mandelbrot_image);
+                }
+                if (rendering_done) {
+                    ClearBackground(GetColor(GuiGetStyle(DEFAULT, BACKGROUND_COLOR)));
+                    UpdateTexture(mandelbrot_texture, mandelbrot_image.data);
                     DrawTexture(mandelbrot_texture, 0, 0, WHITE);
+
+                    char zoom_amount_str[100] = {0};
+                    snprintf(zoom_amount_str, sizeof(zoom_amount_str), "Zoom: %0.2fx", mandelbrot_zoom);
+                    GuiSetStyle(LABEL, TEXT_COLOR_NORMAL, 0x00FF00FF);
+                    GuiSetStyle(LABEL, TEXT_ALIGNMENT, TEXT_ALIGN_LEFT);
+                    GuiLabel(zoom_amount_label, zoom_amount_str);
+                    GuiSetStyle(LABEL, TEXT_COLOR_NORMAL, jungleStyleProps[2].propertyValue);
+                    GuiSetStyle(LABEL, TEXT_ALIGNMENT, TEXT_ALIGN_MIDDLE);
+                    rendering_done = false;
                 }
             }else {
                 ClearBackground(GetColor(GuiGetStyle(DEFAULT, BACKGROUND_COLOR)));
@@ -215,5 +248,6 @@ static void* draw_mandelbrot_img(void* func_args) {
         }
     }
 
-    pthread_exit(0);
+    *(args.rendering_done) = true;
+    return NULL;
 }
